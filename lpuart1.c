@@ -266,6 +266,9 @@ void LPUART_PrintCharAt(uint8_t row, uint8_t col, char c) {
 
 void LPUART_PrintADC( uint16_t min, uint16_t max, uint16_t avg ){
 
+	 float gain_correction = (0.812/0.806);
+	 float offset_correction = -0.893;
+
     char buf[2] = {'\0', '\0'};
 
     LPUART_ESC_Print("[2J");    // clear screen
@@ -282,7 +285,8 @@ void LPUART_PrintADC( uint16_t min, uint16_t max, uint16_t avg ){
     buf[0] =  min        % 10  + '0';  LPUART_Print(buf);
     LPUART_Print("  ");
 
-    uint16_t mv = (uint16_t)((float)min / 4095.0f * 3300.0f); //convert to voltage
+    uint16_t mv = (uint16_t) ( ( ( (float)min / 4095.0f * 3300.0f )
+   		 * gain_correction) + offset_correction); //convert to voltage
 
     buf[0] =  mv / 1000        + '0';  LPUART_Print(buf);
     LPUART_Print(".");
@@ -292,7 +296,7 @@ void LPUART_PrintADC( uint16_t min, uint16_t max, uint16_t avg ){
     LPUART_Print(" V");
 
     // max row
-    LPUART_ESC_Print("[3;1H"); // start cursor on 3rd row
+    LPUART_ESC_Print("[3;1H"); // start cursor on 3rdx row
     LPUART_Print("MAX  ");
 
     buf[0] = (max / 1000)      + '0';  LPUART_Print(buf);
@@ -301,7 +305,8 @@ void LPUART_PrintADC( uint16_t min, uint16_t max, uint16_t avg ){
     buf[0] =  max        % 10  + '0';  LPUART_Print(buf);
     LPUART_Print("  ");
 
-    mv = (uint16_t)((float)max / 4095.0f * 3300.0f); //convert to voltage
+    mv = (uint16_t) ( ( ( (float)max / 4095.0f * 3300.0f )
+   		 * gain_correction) + offset_correction); //convert to voltage
 
     buf[0] =  mv / 1000        + '0';  LPUART_Print(buf);
     LPUART_Print(".");
@@ -320,7 +325,8 @@ void LPUART_PrintADC( uint16_t min, uint16_t max, uint16_t avg ){
     buf[0] =  avg        % 10  + '0';  LPUART_Print(buf);
     LPUART_Print("  ");
 
-    mv = (uint16_t)((float)avg / 4095.0f * 3300.0f); //convert to voltage
+    mv = (uint16_t) ( ( ( (float)avg / 4095.0f * 3300.0f )
+   		 * gain_correction) + offset_correction); //convert to voltage
 
     buf[0] =  mv / 1000        + '0';  LPUART_Print(buf);
     LPUART_Print(".");
