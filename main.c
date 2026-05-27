@@ -16,6 +16,7 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
@@ -25,48 +26,78 @@ uint16_t average_adc = 0;
 volatile uint8_t idx = 0;
 
 void SystemClock_Config(void);
+void PBSW_init(void);
 
 int main(void)
 {
-	HAL_Init();
-	SystemClock_Config();
-	INIT_Lpuart1();       // HAL still intact here
+    HAL_Init();
+    SystemClock_Config();
 
-	LPUART_ESC_Print("[2J");
-	LPUART_ESC_Print("[1;1H");
-	LPUART_Print("after cursor");
-	LPUART_PrintADC(100, 100, 100);
-	//SysTick_Init();       // repurpose SysTick after all HAL-dependent inits
-	ADC_init();           // delay_us(20) now works
+    INIT_Lpuart1();       // HAL still intact here
 
+    LPUART_ESC_Print("[2J");
+    LPUART_ESC_Print("[1;1H");
+    LPUART_Print("after cursor");
+    LPUART_PrintADC(100, 100, 100);
 
-  while (1)
-  {
+    PBSW_init();   
+    ADC_init();           
 
-	  if (conversion_ready) {
-	      adc_samples[idx] = adc_output;
-	      conversion_ready = 0;
-	      idx++;
+    while (1)
+    {
+        // PC13 Pushbutton is active high
+  
+        if ((GPIOC->IDR & GPIO_IDR_ID13) != 0)
+        {
+            GPIOC->ODR |= GPIO_ODR_OD0;   //PC0 HI
+        }
+        else
+        {
+            GPIOC->ODR &= ~(GPIO_ODR_OD0);  //PC0 LO
+        }
 
-	      if (idx == 20) {       // all 20 stored
-	          idx = 0;
-	          min_adc     = calc_Min(adc_samples);
-	          max_adc     = calc_Max(adc_samples);
-	          average_adc = calc_Average(adc_samples);
-	          LPUART_PrintADC(min_adc, max_adc, average_adc);
-	          HAL_Delay(1000);
-	      }
-	  }
+        if (conversion_ready)
+        {
+            adc_samples[idx] = adc_output;
+            conversion_ready = 0;
+            idx++;
 
-  }
+            if (idx == 20)   
+            {
+                idx = 0;
+                min_adc     = calc_Min(adc_samples);
+                max_adc     = calc_Max(adc_samples);
+                average_adc = calc_Average(adc_samples);
 
-
-
-
-
+                LPUART_PrintADC(min_adc, max_adc, average_adc);
+                HAL_Delay(1000);
+            }
+        }
+    }
 }
 
-
+/**
+  * @brief Initialize pushbutton on PC13 and output on PC0
+  * @retval None
+  */
+void PBSW_init(void)
+{
+   // initialize PC13 input and PC0 output
+	
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;
+    
+    //PC13
+    GPIOC->MODER &= ~(GPIO_MODER_MODE13);
+    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD13);
+    
+    //PC0
+    GPIOC->MODER &= ~(GPIO_MODER_MODE0);
+    GPIOC->MODER |=  (1 << GPIO_MODER_MODE0_Pos);
+    GPIOC->OTYPER &= ~(GPIO_OTYPER_OT0);
+    GPIOC->OSPEEDR &= ~(GPIO_OSPEEDR_OSPEED0);
+    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD0);
+    GPIOC->ODR &= ~(GPIO_ODR_OD0);
+}
 
 /**
   * @brief System Clock Configuration
@@ -74,42 +105,44 @@ int main(void)
   */
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage
-  */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    /** Configure the main internal regulator output voltage
+    */
+    if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+    {
+        Error_Handler();
+    }
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    /** Initializes the RCC Oscillators according to the specified parameters
+    * in the RCC_OscInitTypeDef structure.
+    */
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+    RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+    RCC_OscInitStruct.MSICalibrationValue = 0;
+    RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    {
+        Error_Handler();
+    }
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    /** Initializes the CPU, AHB and APB buses clocks
+    */
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                                | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+    {
+        Error_Handler();
+    }
 }
 
 /* USER CODE BEGIN 4 */
@@ -122,15 +155,18 @@ void SystemClock_Config(void)
   */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
+    /* USER CODE BEGIN Error_Handler_Debug */
+    __disable_irq();
+
+    while (1)
+    {
+    }
+
+    /* USER CODE END Error_Handler_Debug */
 }
+
 #ifdef USE_FULL_ASSERT
+
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
@@ -140,9 +176,12 @@ void Error_Handler(void)
   */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+    /* USER CODE BEGIN 6 */
+    /*
+     * User can add his own implementation to report the file name and line number,
+     * ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line)
+     */
+    /* USER CODE END 6 */
 }
+
 #endif /* USE_FULL_ASSERT */
